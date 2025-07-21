@@ -1,0 +1,111 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Circle Packing Visualizer</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
+    label { display: block; margin: 10px 0 5px; }
+    input { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; }
+    button { padding: 10px 15px; font-size: 16px; margin-right: 10px; }
+    #canvas { border: 1px solid #333; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Circle Packing Visualizer</h1>
+  <label for="widthInput">Rectangle Width (mm):</label>
+  <input id="widthInput" type="number" value="300" />
+  <label for="heightInput">Rectangle Height (mm):</label>
+  <input id="heightInput" type="number" value="1000" />
+  <label for="diameterInput">Circle Diameter (mm):</label>
+  <input id="diameterInput" type="number" value="80" />
+  <button onclick="drawPacking()">Calculate & Draw</button>
+  <button onclick="clearInputs()">Clear</button>
+  <canvas id="canvas" width="800" height="400"></canvas>
+
+  <script>
+    // Generate hexagonal grid coordinates
+    function hexCoords(W, H, D) {
+      const r = D/2;
+      const vStep = r * Math.sqrt(3);
+      const coords = [];
+      let row = 0;
+      for (let y = r; y <= H - r + 1e-6; y += vStep) {
+        const offset = (row % 2) * r;
+        for (let x = r + offset; x <= W - r + 1e-6; x += 2 * r) {
+          coords.push({x, y});
+        }
+        row++;
+      }
+      return coords;
+    }
+    // Generate square grid coordinates
+    function squareCoords(W, H, D) {
+      const r = D/2;
+      const coords = [];
+      for (let y = r; y <= H - r; y += D) {
+        for (let x = r; x <= W - r; x += D) {
+          coords.push({x, y});
+        }
+      }
+      return coords;
+    }
+    function drawPacking() {
+      const w = parseFloat(document.getElementById('widthInput').value);
+      const h = parseFloat(document.getElementById('heightInput').value);
+      const D = parseFloat(document.getElementById('diameterInput').value);
+      if (!w || !h || !D) { alert('Please enter positive numbers.'); return; }
+
+      // compute coords and counts
+      const sqCoords = squareCoords(w, h, D);
+      const hex1 = hexCoords(w, h, D);
+      const hex2Raw = hexCoords(h, w, D);
+      const hex2 = hex2Raw.map(c => ({x: c.y, y: c.x}));
+
+      // choose best
+      let bestCoords = sqCoords;
+      let bestCount = sqCoords.length;
+      if (hex1.length > bestCount) {
+        bestCount = hex1.length;
+        bestCoords = hex1;
+      }
+      if (hex2.length > bestCount) {
+        bestCount = hex2.length;
+        bestCoords = hex2;
+      }
+
+      // draw
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const margin = 20;
+      const scaleX = (canvas.width - 2*margin) / w;
+      const scaleY = (canvas.height - 2*margin) / h;
+      const scale = Math.min(scaleX, scaleY);
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(margin, margin, w*scale, h*scale);
+      ctx.beginPath();
+      for (const c of bestCoords) {
+        ctx.moveTo(margin + c.x*scale + D/2*scale, margin + c.y*scale);
+        ctx.arc(margin + c.x*scale, margin + c.y*scale, D/2*scale, 0, Math.PI*2);
+      }
+      ctx.stroke();
+      ctx.font = '16px Arial';
+      ctx.fillStyle = '#000';
+      ctx.fillText(`Max circles: ${bestCount}`, margin, canvas.height - margin/2);
+    }
+    function clearInputs() {
+      document.getElementById('widthInput').value = '';
+      document.getElementById('heightInput').value = '';
+      document.getElementById('diameterInput').value = '';
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    drawPacking();
+  </script>
+</body>
+</html>
