@@ -1,0 +1,134 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Centered Circle Packing & Annotations</title>
+<style>
+  body    { font-family: Arial, sans-serif; max-width: 840px; margin: auto; padding: 20px; }
+  label   { display:block; margin:10px 0 5px; }
+  input   { width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box; }
+  button  { padding:10px 15px; font-size:16px; margin-right:10px; }
+  #canvas { border:1px solid #333; margin-top:20px; }
+</style>
+</head>
+<body>
+<h1>Centered Circle Packing &amp; Annotations</h1>
+
+<label>Rectangle Width (mm):</label>
+<input id="widthInput"  type="number" value="300">
+<label>Rectangle Height (mm):</label>
+<input id="heightInput" type="number" value="1000">
+<label>Circle Diameter (mm):</label>
+<input id="diameterInput" type="number" value="80">
+<label>Circle Count (要放幾顆):</label>
+<input id="countInput"    type="number" value="40">
+
+<button onclick="draw()">Draw</button>
+<button onclick="clearAll()">Clear</button>
+
+<canvas id="canvas" width="800" height="560"></canvas>
+
+<script>
+/* ---------- 三種排法 ---------- */
+const squareCoords=(W,H,D)=>{const r=D/2,a=[];for(let y=r;y<=H-r+1e-6;y+=D)for(let x=r;x<=W-r+1e-6;x+=D)a.push({x,y});return a;}
+const hexCoords=(W,H,D)=>{const r=D/2,v=r*Math.sqrt(3),a=[];for(let row=0,y=r;y<=H-r+1e-6;y+=v,row++){const off=(row%2)*r;for(let x=r+off;x<=W-r+1e-6;x+=2*r)a.push({x,y});}return a;}
+function bestPacking(W,H,D){
+  const sq=squareCoords(W,H,D),h1=hexCoords(W,H,D),h2=hexCoords(H,W,D).map(p=>({x:p.y,y:p.x}));
+  return [sq,h1,h2].reduce((best,c)=>c.length>best.length?c:best);
+}
+/* ---------- 修剪、拉伸 ---------- */
+const trimBottom=(arr,N)=>[...arr].sort((a,b)=>a.y-b.y).slice(0,N);
+function stretchToEdges(arr,W,H,D){
+  const r=D/2;let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+  arr.forEach(p=>{if(p.x<minX)minX=p.x;if(p.x>maxX)maxX=p.x;if(p.y<minY)minY=p.y;if(p.y>maxY)maxY=p.y;});
+  const kx=(W-D)/(maxX-minX),ky=(H-D)/(maxY-minY);
+  arr.forEach(p=>{p.x=r+(p.x-minX)*kx;p.y=r+(p.y-minY)*ky;});
+}
+/* ---------- 畫箭頭 ---------- */
+function arrow(ctx,x1,y1,x2,y2,color){
+  const h=6,ang=Math.atan2(y2-y1,x2-x1);
+  ctx.strokeStyle=color;ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x1,y1);ctx.lineTo(x1+h*Math.cos(ang+Math.PI/8),y1+h*Math.sin(ang+Math.PI/8));
+  ctx.moveTo(x1,y1);ctx.lineTo(x1+h*Math.cos(ang-Math.PI/8),y1+h*Math.sin(ang-Math.PI/8));
+  ctx.moveTo(x2,y2);ctx.lineTo(x2-h*Math.cos(ang+Math.PI/8),y2-h*Math.sin(ang+Math.PI/8));
+  ctx.moveTo(x2,y2);ctx.lineTo(x2-h*Math.cos(ang-Math.PI/8),y2-h*Math.sin(ang-Math.PI/8));
+  ctx.stroke();
+}
+/* ---------- 主流程 ---------- */
+function draw(){
+  const W=+widthInput.value,H=+heightInput.value,D=+diameterInput.value,N=+countInput.value;
+  if(!(W&&H&&D&&N)) return alert('請輸入有效值');
+  if(D>W||D>H)       return alert('圓直徑大於矩形邊長');
+  const all=bestPacking(W,H,D);
+  if(N>all.length)   return alert(`最多 ${all.length} 顆，放不下！`);
+
+  const coords=trimBottom(all,N);stretchToEdges(coords,W,H,D);
+
+  /* ---- Canvas 佈局 ---- */
+  const cvs=canvas,ctx=cvs.getContext('2d'),pad=40,topSpace=60;
+  ctx.clearRect(0,0,cvs.width,cvs.height);
+  const sX=(cvs.width-2*pad)/W, sY=(cvs.height-topSpace-2*pad)/H, s=Math.min(sX,sY);
+  const rectW=W*s, rectH=H*s;
+  const rectX=(cvs.width-rectW)/2, rectY=topSpace+(cvs.height-topSpace-rectH)/2;
+  const toC=p=>({X:rectX+p.x*s,Y:rectY+p.y*s});
+
+  /* ---- 外框 & 圓 ---- */
+  ctx.strokeStyle='#333';ctx.lineWidth=1.2;ctx.strokeRect(rectX,rectY,rectW,rectH);
+  ctx.beginPath();coords.forEach(p=>{const {X,Y}=toC(p);ctx.moveTo(X+D/2*s,Y);ctx.arc(X,Y,D/2*s,0,Math.PI*2);});ctx.stroke();
+
+  /* ==== 標註 ==== */
+  const tol=1e-5,minY=Math.min(...coords.map(p=>p.y));
+  const topRow=coords.filter(p=>Math.abs(p.y-minY)<tol*H).sort((a,b)=>a.x-b.x);
+  const distinctY=[...new Set(coords.map(p=>p.y))].sort((a,b)=>a-b);
+
+  ctx.font='bold 18px Arial';
+
+  /* --- 紅色水平 --- */
+  if(topRow.length>=2){
+    const dx=(topRow[1].x-topRow[0].x).toFixed(1);
+    const c1=toC(topRow[0]),c2=toC(topRow[1]);
+    const yA=rectY-25;
+    arrow(ctx,c1.X,yA,c2.X,yA,'red');
+    ctx.fillStyle='red';ctx.textAlign='center';
+    ctx.fillText(`水平的圓心距離 ${dx} mm`,(c1.X+c2.X)/2,yA-6);
+  }
+
+  /* --- 藍色垂直 --- */
+  if(distinctY.length>=2){
+    const vGap=(distinctY[1]-distinctY[0]).toFixed(1);
+    const y1=toC({x:0,y:distinctY[0]}).Y, y2=toC({x:0,y:distinctY[1]}).Y;
+    const xA=rectX-25;
+    arrow(ctx,xA,y1,xA,y2,'blue');
+    ctx.fillStyle='blue';ctx.textAlign='right';
+    ctx.fillText(`垂直的圓心距離 ${vGap} mm`,xA-6,(y1+y2)/2+6);
+  }
+
+  /* --- 綠色直徑 --- */
+  let bottomMost=coords[0];
+  coords.forEach(p=>{if(p.y>bottomMost.y||(Math.abs(p.y-bottomMost.y)<tol&&p.x>bottomMost.x))bottomMost=p;});
+  const bC=toC(bottomMost);
+  ctx.fillStyle='green';ctx.textAlign='left';
+  ctx.fillText(`振子的直徑：${D} mm`,bC.X+D/2*s+6,bC.Y+6);
+
+  /* --- 底部資訊 (咖啡色) --- */
+  ctx.textAlign='left';ctx.font='bold 18px Arial';ctx.fillStyle='saddlebrown';
+  const infoY=cvs.height-45;
+  ctx.fillText(`振板寬度：${W} mm`, pad, infoY);
+  ctx.fillText(`振板高度：${H} mm`, pad, infoY+22);
+
+  /* --- Placed/Max (黑字小) --- */
+  ctx.fillStyle='#000';ctx.font='16px Arial';
+  ctx.fillText(`Placed: ${N}  (Max: ${all.length})`, pad, infoY-25);
+}
+function clearAll(){
+  ['widthInput','heightInput','diameterInput','countInput'].forEach(id=>document.getElementById(id).value='');
+  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+}
+draw();
+</script>
+</body>
+</html>
