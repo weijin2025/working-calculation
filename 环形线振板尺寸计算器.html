@@ -1,0 +1,150 @@
+
+
+
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>微晶環形線振板尺寸計算器</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f7f7f7; }
+    #wrapper { max-width: 600px; margin: 50px auto; background: #fff; padding: 20px; border-radius: 8px; }
+    .center { text-align: center; }
+    .field { margin-bottom: 20px; }
+    label { display: inline-block; width: 150px; text-align: right; margin-right: 10px; vertical-align: middle; }
+    input[type="number"], input[type="password"], select { width: 20%; padding: 6px; vertical-align: middle; }
+    .note { display: block; margin-left: 160px; color: #666; font-size: 0.9em; text-align: left; }
+    button { padding: 10px 20px; font-size: 16px; margin: 20px auto; display: block; }
+    #error, #pwdError { color: red; text-align: center; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div id="wrapper">
+    <div id="passwordScreen" class="center">
+      <h1>请输入密码</h1>
+      <input type="password" id="pwdInput" placeholder="密码">
+      <button onclick="checkPwd()">确认</button>
+      <div id="pwdError"></div>
+    </div>
+    <div id="calculator" style="display:none;">
+      <h1 class="center">微晶環形線振板尺寸計算器</h1>
+      <div id="form">
+        <div class="field">
+          <label for="D6">水槽臂距 (mm)：</label>
+          <input type="number" id="D6" value="900">
+          <span class="note">環形線每個手臂之間的距離</span>
+        </div>
+        <div class="field">
+          <label for="D7">水槽寬度 (mm)：</label>
+          <input type="number" id="D7" value="800">
+          <span class="note">超聲波水槽內側到外側的距離</span>
+        </div>
+        <div class="field">
+          <label for="D8">水槽高度 (mm)：</label>
+          <input type="number" id="D8" value="1500">
+          <span class="note">超聲波水槽的槽內側高度</span>
+        </div>
+        <div class="field">
+          <label for="D9">振板頻率 (KHz)：</label>
+          <select id="D9">
+            <option value="">請選擇</option>
+            <option value="28" selected>28</option>
+            <option value="40">40</option>
+          </select>
+          <span class="note">振板的工作頻率</span>
+        </div>
+        <div class="field">
+          <label for="D10">安全邊距 (mm)：</label>
+          <input type="number" id="D10" value="80">
+          <span class="note">振板左右側的安全距離</span>
+        </div>
+        <div class="field">
+          <label for="D11">每升瓦數 (W/L)：</label>
+          <input type="number" id="D11" value="7">
+          <span class="note">單槽超聲波總功率(W)/水槽容積(L)</span>
+        </div>
+        <div class="field">
+          <label for="D12">振子瓦數 (W)：</label>
+          <input type="number" id="D12" value="50">
+          <span class="note">振板內每顆振子瓦數</span>
+        </div>
+        <div class="field">
+          <label for="D13">振子外徑 (mm)：</label>
+          <input type="number" id="D13" value="80">
+          <span class="note">振板內每顆振子的中點相距距離，此數值請勿低於70</span>
+        </div>
+        <button type="button" onclick="calculate()">開始計算</button>
+      </div>
+      <div id="error"></div>
+      <div id="output"></div>
+    </div>
+  </div>
+<script>
+function checkPwd() {
+  const pwd = document.getElementById('pwdInput').value;
+  const err = document.getElementById('pwdError');
+  if(pwd === '1168') {
+    document.getElementById('passwordScreen').style.display = 'none';
+    document.getElementById('calculator').style.display = 'block';
+  } else {
+    err.textContent = '密碼錯誤';
+  }
+}
+
+function calculate() {
+  document.getElementById('error').textContent = '';
+  document.getElementById('output').innerHTML = '';
+  const ids = ['D6','D7','D8','D9','D10','D11','D12','D13'];
+  const vals = {};
+  for(let id of ids) {
+    const el = document.getElementById(id);
+    const v = id==='D9' ? el.value : parseFloat(el.value);
+    if(id==='D9') {
+      if(!v) { document.getElementById('error').textContent='請輸入正確數值'; return; }
+      vals[id]=parseInt(v,10);
+    } else {
+      if(isNaN(v)||v<=0){ document.getElementById('error').textContent='請輸入正確數值'; return; }
+      vals[id]=v;
+    }
+  }
+  const {D6,D7,D8,D9,D10,D11,D12,D13} = vals;
+  const 容量 = D6*D7*(D8-100)/1e6;
+  const denom = Math.ceil((D6-D10*3)/2/50)*50;
+  const 每臂數量 = denom<=0?4:Math.floor(D6/denom)*2;
+  const 厚度 = D9===28?100:80;
+  const valW = Math.ceil((D6-D10*3)/2/50)*50;
+  const 寬度 = valW<=0?'水槽臂距或安全邊距有誤':(valW<200?'振板寬度小於200mm，請留意':valW);
+  const 高度 = D8-300;
+  const sqrt3=Math.sqrt(3), w=valW, h=高度;
+  const n1=Math.floor(h/D13)*Math.floor(w/D13);
+  const n2=Math.floor((1+(w-D13)/(D13*sqrt3/2))+1);
+  const r1=Math.floor(n2/2)*Math.floor(h/D13)+Math.floor((n2-1)/2)*Math.floor((h-D13/2)/D13);
+  const n3=Math.floor((1+(h-D13)/(D13*sqrt3/2))+1);
+  const r2=Math.floor(n3/2)*Math.floor(w/D13)+Math.floor((n3-1)/2)*Math.floor((w-D13/2)/D13);
+  const 最大振子數=Math.max(n1,r1,r2);
+  const base=(容量*D11/每臂數量)/D12;
+  const ceiled=Math.ceil(base/6)*6;
+  const 每顆功率=ceiled*D12;
+  const 平均每升=每顆功率*每臂數量/容量;
+  const out=document.getElementById('output');
+  [['水槽容量：',容量.toFixed(2)+' L'],
+   ['每臂振板數量：',每臂數量],
+   ['振板厚度：',厚度+' mm'],
+   ['振板寬度：',寬度+' mm'],
+   ['振板高度：',高度+' mm'],
+   ['最大振子數：',最大振子數+' pcs'],
+   ['每顆振板功率：',每顆功率+' W'],
+   ['平均每升功率：',平均每升.toFixed(2)+' W/L']
+  ].forEach(([l,v])=>{
+    const d=document.createElement('div');
+    d.textContent=l+v;
+    out.appendChild(d);
+  });
+}
+// 禁用右键菜单
+document.addEventListener('contextmenu', function(e) {
+  e.preventDefault();
+});
+</script>
+</body>
+</html>
