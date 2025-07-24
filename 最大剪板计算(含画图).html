@@ -1,0 +1,103 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rectangle Packing Visualizer</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: auto; padding: 20px; }
+    label { display: block; margin: 10px 0 5px; }
+    input { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; }
+    button { padding: 10px 15px; font-size: 16px; margin-right: 10px; }
+    #canvas { border: 1px solid #333; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Rectangle Packing Visualizer</h1>
+  <label for="outerWidth">Container Width (cm):</label>
+  <input id="outerWidth" type="number" value="1500" />
+  <label for="outerHeight">Container Height (cm):</label>
+  <input id="outerHeight" type="number" value="3300" />
+  <label for="innerWidth">Inner Rectangle Width (cm):</label>
+  <input id="innerWidth" type="number" value="450" />
+  <label for="innerHeight">Inner Rectangle Height (cm):</label>
+  <input id="innerHeight" type="number" value="1100" />
+  <button onclick="drawPacking()">Calculate & Draw</button>
+  <button onclick="clearInputs()">Clear</button>
+  <canvas id="canvas" width="900" height="400"></canvas>
+
+  <script>
+    function drawPacking() {
+      const W = parseFloat(document.getElementById('outerWidth').value);
+      const H = parseFloat(document.getElementById('outerHeight').value);
+      const w = parseFloat(document.getElementById('innerWidth').value);
+      const h = parseFloat(document.getElementById('innerHeight').value);
+      if (!W || !H || !w || !h) { alert('Please enter positive numbers.'); return; }
+
+      // Compute grid placements
+      function countCoords(Wc, Hc, wi, hi) {
+        const cols = Math.floor(Wc / wi);
+        const rows = Math.floor(Hc / hi);
+        const coords = [];
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            coords.push({ x: c * wi, y: r * hi, wi, hi });
+          }
+        }
+        return coords;
+      }
+
+      // Orientation 1: w x h
+      const coords1 = countCoords(W, H, w, h);
+      // Orientation 2: rotate inner rectangles: h x w
+      const coords2 = countCoords(W, H, h, w);
+
+      let best = coords1;
+      if (coords2.length > coords1.length) best = coords2;
+      const count = best.length;
+
+      // Draw
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const margin = 20;
+      const scaleX = (canvas.width - 2*margin) / W;
+      const scaleY = (canvas.height - 2*margin) / H;
+      const scale = Math.min(scaleX, scaleY);
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      // draw container
+      ctx.strokeRect(margin, margin, W * scale, H * scale);
+      // draw inner rectangles
+      ctx.beginPath();
+      for (const r of best) {
+        ctx.rect(
+          margin + r.x * scale,
+          margin + r.y * scale,
+          r.wi * scale,
+          r.hi * scale
+        );
+      }
+      ctx.stroke();
+      // label
+      ctx.font = '16px Arial';
+      ctx.fillStyle = '#000';
+      ctx.fillText(`Max rectangles: ${count}`, margin, canvas.height - margin / 2);
+    }
+
+    function clearInputs() {
+      document.getElementById('outerWidth').value = '';
+      document.getElementById('outerHeight').value = '';
+      document.getElementById('innerWidth').value = '';
+      document.getElementById('innerHeight').value = '';
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Initial draw
+    drawPacking();
+  </script>
+</body>
+</html>
